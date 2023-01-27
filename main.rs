@@ -1,4 +1,3 @@
-#![allow(unused)]
 use anyhow::{Context, Result};
 use ash::{
     self,
@@ -77,7 +76,7 @@ fn main() -> Result<()> {
         };
 
         let allocation = allocator.allocate(&allocation_create_description)?;
-        unsafe { device.bind_buffer_memory(buffer, allocation.memory(), allocation.offset()) };
+        unsafe { device.bind_buffer_memory(buffer, allocation.memory(), allocation.offset()) }?;
         allocation
     };
 
@@ -126,12 +125,12 @@ fn main() -> Result<()> {
     {
         let submit_info =
             vk::SubmitInfo::builder().command_buffers(std::slice::from_ref(&command_buffer));
-        unsafe { device.queue_submit(queue, std::slice::from_ref(&submit_info), fence) };
+        unsafe { device.queue_submit(queue, std::slice::from_ref(&submit_info), fence) }?;
     }
 
     // Wait for the execution to complete
     let start = time::Instant::now();
-    unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) };
+    unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }?;
     println!("GPU took {:?}", time::Instant::now() - start);
 
     let data = allocation
@@ -145,7 +144,7 @@ fn main() -> Result<()> {
         width as u32,
         height as u32,
         image::ColorType::Rgba8,
-    );
+    )?;
     println!("Saving took {:?}", time::Instant::now() - start);
 
     // Cleanup
