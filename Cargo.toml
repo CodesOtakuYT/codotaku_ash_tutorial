@@ -1,0 +1,13 @@
+[package]
+name = "vulkan_ash_tutorial"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.68"
+ash = "0.37.2"
+bytemuck = "1.13.0"
+gpu-allocator = "0.21.0"
+image = "0.24.5"
