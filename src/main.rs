@@ -1,5 +1,3 @@
-#![warn(unused_must_use)]
-
 use anyhow::{Context, Result};
 use ash::{
     self,
@@ -182,6 +180,7 @@ fn main() -> Result<()> {
             // Wait for the execution to complete
             unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }
                 .unwrap();
+            unsafe{ device.reset_fences(std::slice::from_ref(&fence)) }.unwrap();
 
             let data = bytemuck::cast_slice(
                 allocation
@@ -206,6 +205,7 @@ fn main() -> Result<()> {
                     unsafe { device.destroy_fence(fence, None) }
                     unsafe { device.destroy_command_pool(command_pool, None) }
 
+                    unsafe{ device.free_memory(allocation.memory(), None) };
                     // allocator.free(allocation).unwrap();
                     unsafe { device.destroy_buffer(buffer, None) }
 
