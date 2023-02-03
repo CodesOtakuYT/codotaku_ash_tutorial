@@ -86,7 +86,7 @@ fn main() -> Result<()> {
     let mut t: f64 = 0.0;
     {
         // Create allocator
-        let mut allocator = {
+        let mut allocator = Option::Some({
             let allocator_create_description = AllocatorCreateDesc {
                 instance: instance.clone(),
                 device: device.clone(),
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
                 buffer_device_address: false,
             };
             Allocator::new(&allocator_create_description)?
-        };
+        });
 
         let value_count = width * height;
 
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
             unsafe { device.create_buffer(&create_info, None) }?
         };
 
-        let allocation = {
+        let mut allocation = Option::Some({
             let memory_requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
 
             let allocation_create_description = AllocationCreateDesc {
@@ -117,10 +117,10 @@ fn main() -> Result<()> {
                 linear: true,
             };
 
-            let allocation = allocator.allocate(&allocation_create_description)?;
+            let allocation = allocator.as_mut().unwrap().allocate(&allocation_create_description)?;
             unsafe { device.bind_buffer_memory(buffer, allocation.memory(), allocation.offset()) }?;
             allocation
-        };
+        });
 
         let command_pool = {
             let create_info = vk::CommandPoolCreateInfo::builder()
@@ -167,8 +167,8 @@ fn main() -> Result<()> {
                 device.cmd_fill_buffer(
                     command_buffer,
                     buffer,
-                    allocation.offset(),
-                    allocation.size(),
+                    allocation.as_ref().unwrap().offset(),
+                    allocation.as_ref().unwrap().size(),
                     value,
                 )
             }
@@ -184,7 +184,7 @@ fn main() -> Result<()> {
             }
 
             let data = bytemuck::cast_slice(
-                allocation
+                allocation.as_ref().unwrap()
                     .mapped_slice()
                     .context("Cannot access buffer from Host")
                     .unwrap(),
@@ -208,8 +208,8 @@ fn main() -> Result<()> {
                     unsafe { device.destroy_fence(fence, None) }
                     unsafe { device.destroy_command_pool(command_pool, None) }
 
-                    unsafe{ device.free_memory(allocation.memory(), None) };
-                    // allocator.free(allocation).unwrap();
+                    allocator.as_mut().unwrap().free(allocation.take().unwrap()).unwrap();
+                    drop(allocator.take().unwrap());
                     unsafe { device.destroy_buffer(buffer, None) }
 
                     unsafe { device.destroy_device(None) }
