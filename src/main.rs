@@ -142,7 +142,7 @@ fn main() -> Result<()> {
 
         // Creating synchronization object (Fence)
         let fence = {
-            let create_info = vk::FenceCreateInfo::builder().build();
+            let create_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED).build();
             unsafe { device.create_fence(&create_info, None) }?
         };
 
@@ -150,6 +150,12 @@ fn main() -> Result<()> {
             let start = time::Instant::now();
             t += 0.001;
             red = ((t.sin() * 0.5 + 0.5) * 255.0) as u32;
+
+            // Wait for the execution to complete
+            unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }
+            .unwrap();
+            unsafe{ device.reset_fences(std::slice::from_ref(&fence)) }.unwrap();
+
             // Recording command buffer
             {
                 let begin_info = vk::CommandBufferBeginInfo::builder();
@@ -177,11 +183,6 @@ fn main() -> Result<()> {
                     .unwrap();
             }
 
-            // Wait for the execution to complete
-            unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }
-                .unwrap();
-            unsafe{ device.reset_fences(std::slice::from_ref(&fence)) }.unwrap();
-
             let data = bytemuck::cast_slice(
                 allocation
                     .mapped_slice()
@@ -202,6 +203,8 @@ fn main() -> Result<()> {
                     }
                 }
                 winit::event::Event::LoopDestroyed => {
+                    unsafe{ device.queue_wait_idle(queue)}.unwrap();
+
                     unsafe { device.destroy_fence(fence, None) }
                     unsafe { device.destroy_command_pool(command_pool, None) }
 
