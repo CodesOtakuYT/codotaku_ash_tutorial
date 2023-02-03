@@ -117,7 +117,10 @@ fn main() -> Result<()> {
                 linear: true,
             };
 
-            let allocation = allocator.as_mut().unwrap().allocate(&allocation_create_description)?;
+            let allocation = allocator
+                .as_mut()
+                .unwrap()
+                .allocate(&allocation_create_description)?;
             unsafe { device.bind_buffer_memory(buffer, allocation.memory(), allocation.offset()) }?;
             allocation
         });
@@ -142,82 +145,91 @@ fn main() -> Result<()> {
 
         // Creating synchronization object (Fence)
         let fence = {
-            let create_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED).build();
+            let create_info = vk::FenceCreateInfo::builder()
+                .flags(vk::FenceCreateFlags::SIGNALED)
+                .build();
             unsafe { device.create_fence(&create_info, None) }?
         };
 
-        event_loop.run(move |event, _, control_flow| {
-            let start = time::Instant::now();
-            t += 0.001;
-            red = ((t.sin() * 0.5 + 0.5) * 255.0) as u32;
-
-            // Wait for the execution to complete
-            unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }
-            .unwrap();
-            unsafe{ device.reset_fences(std::slice::from_ref(&fence)) }.unwrap();
-
-            // Recording command buffer
-            {
-                let begin_info = vk::CommandBufferBeginInfo::builder();
-                unsafe { device.begin_command_buffer(command_buffer, &begin_info) }.unwrap();
-            }
-
-            let value = blue | green << 8 | red << 16;
-            unsafe {
-                device.cmd_fill_buffer(
-                    command_buffer,
-                    buffer,
-                    allocation.as_ref().unwrap().offset(),
-                    allocation.as_ref().unwrap().size(),
-                    value,
-                )
-            }
-
-            unsafe { device.end_command_buffer(command_buffer) }.unwrap();
-
-            // Execute command buffer by uploading it to the GPU through the queue
-            {
-                let submit_info = vk::SubmitInfo::builder()
-                    .command_buffers(std::slice::from_ref(&command_buffer));
-                unsafe { device.queue_submit(queue, std::slice::from_ref(&submit_info), fence) }
-                    .unwrap();
-            }
-
-            let data = bytemuck::cast_slice(
-                allocation.as_ref().unwrap()
-                    .mapped_slice()
-                    .context("Cannot access buffer from Host")
-                    .unwrap(),
-            );
-
-            graphics_context.set_buffer(data, width as u16, height as u16);
-            match event {
-                winit::event::Event::WindowEvent { window_id, event } => {
-                    if window_id == window.id() {
-                        match event {
-                            winit::event::WindowEvent::CloseRequested => {
-                                control_flow.set_exit();
-                            }
-                            _ => {}
+        event_loop.run(move |event, _, control_flow| match event {
+            winit::event::Event::WindowEvent { window_id, event } => {
+                if window_id == window.id() {
+                    match event {
+                        winit::event::WindowEvent::CloseRequested => {
+                            control_flow.set_exit();
                         }
+                        _ => {}
                     }
                 }
-                winit::event::Event::LoopDestroyed => {
-                    unsafe{ device.queue_wait_idle(queue)}.unwrap();
-
-                    unsafe { device.destroy_fence(fence, None) }
-                    unsafe { device.destroy_command_pool(command_pool, None) }
-
-                    allocator.as_mut().unwrap().free(allocation.take().unwrap()).unwrap();
-                    drop(allocator.take().unwrap());
-                    unsafe { device.destroy_buffer(buffer, None) }
-
-                    unsafe { device.destroy_device(None) }
-                    unsafe { instance.destroy_instance(None) }
-                }
-                _ => {}
             }
-            println!("{:?}", time::Instant::now() - start);
+            winit::event::Event::MainEventsCleared => {
+                let start = time::Instant::now();
+                t += 0.001;
+                red = ((t.sin() * 0.5 + 0.5) * 255.0) as u32;
+                // Wait for the execution to complete
+                unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX) }
+                    .unwrap();
+                unsafe { device.reset_fences(std::slice::from_ref(&fence)) }.unwrap();
+
+                // Recording command buffer
+                {
+                    let begin_info = vk::CommandBufferBeginInfo::builder();
+                    unsafe { device.begin_command_buffer(command_buffer, &begin_info) }.unwrap();
+                }
+
+                let value = blue | green << 8 | red << 16;
+                unsafe {
+                    device.cmd_fill_buffer(
+                        command_buffer,
+                        buffer,
+                        allocation.as_ref().unwrap().offset(),
+                        allocation.as_ref().unwrap().size(),
+                        value,
+                    )
+                }
+
+                unsafe { device.end_command_buffer(command_buffer) }.unwrap();
+
+                // Execute command buffer by uploading it to the GPU through the queue
+                {
+                    let submit_info = vk::SubmitInfo::builder()
+                        .command_buffers(std::slice::from_ref(&command_buffer));
+                    unsafe {
+                        device.queue_submit(queue, std::slice::from_ref(&submit_info), fence)
+                    }
+                    .unwrap();
+                }
+
+                let data = bytemuck::cast_slice(
+                    allocation
+                        .as_ref()
+                        .unwrap()
+                        .mapped_slice()
+                        .context("Cannot access buffer from Host")
+                        .unwrap(),
+                );
+
+                graphics_context.set_buffer(data, width as u16, height as u16);
+                println!("{:?}", time::Instant::now() - start);
+            }
+            winit::event::Event::LoopDestroyed => {
+                unsafe { device.queue_wait_idle(queue) }.unwrap();
+
+                unsafe { device.destroy_fence(fence, None) }
+                unsafe { device.destroy_command_pool(command_pool, None) }
+
+                allocator
+                    .as_mut()
+                    .unwrap()
+                    .free(allocation.take().unwrap())
+                    .unwrap();
+                drop(allocator.take().unwrap());
+                unsafe { device.destroy_buffer(buffer, None) }
+
+                unsafe { device.destroy_device(None) }
+                unsafe { instance.destroy_instance(None) }
+            }
+            _ => {}
         });
     }
 }
