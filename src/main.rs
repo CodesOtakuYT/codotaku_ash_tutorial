@@ -206,7 +206,7 @@ fn main() -> Result<()> {
                     unsafe { device.destroy_fence(fence, None) }
                     unsafe { device.destroy_command_pool(command_pool, None) }
 
-                    allocator.free(allocation).unwrap();
+                    // allocator.free(allocation).unwrap();
                     unsafe { device.destroy_buffer(buffer, None) }
 
                     unsafe { device.destroy_device(None) }
